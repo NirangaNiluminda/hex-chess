@@ -11,3 +11,4 @@ GREY = (170, 170, 170)
 BACKGROUND = (238, 238,210)
 OUTLINE = (30, 30, 30)
 HIGHLIGHT = (255, 253, 208)
+LEGAL_MOVE_HIGHLIGHT = (144, 238, 144, 100)  # Light green with transparency
