@@ -36,6 +36,7 @@ class HexBoard:
         self.size = size
         self.radius = hex_radius
         self.tiles: Dict[Tuple[int, int], HexTile] = {}
+        self.current_turn = "white"  # Track whose turn it is
         self._generate_tiles()
         
     def _generate_tiles(self):
@@ -114,11 +115,22 @@ class HexBoard:
         from_tile = self.get_tile(from_q, from_r)
         to_tile = self.get_tile(to_q, to_r)
         
-        if from_tile and to_tile and from_tile.has_piece() and from_tile != to_tile:
-            to_tile.piece = from_tile.piece
-            from_tile.remove_piece()
-            return True
-        return False
+        if not from_tile or not to_tile or not from_tile.has_piece() or from_tile == to_tile:
+            return False
+        
+        piece_color, _ = from_tile.get_piece()
+        
+        # Check if it's this color's turn
+        if piece_color != self.current_turn:
+            return False
+        
+        # Make the move
+        to_tile.piece = from_tile.piece
+        from_tile.remove_piece()
+        
+        # Switch turns
+        self.current_turn = "black" if self.current_turn == "white" else "white"
+        return True
     
     def get_hex_corners(self, center_x: float, center_y: float) -> list:
         """Calculate the six corner points of a hexagon."""
@@ -153,6 +165,10 @@ class HexBoard:
         
         piece_color, piece_name = tile.get_piece()
         
+        # Only show legal moves if it's this piece's turn
+        if piece_color != self.current_turn:
+            return []
+        
         if piece_name == "pawn":
             return self._get_pawn_moves(q, r, piece_color)
         elif piece_name == "knight":
@@ -169,29 +185,57 @@ class HexBoard:
         return []
     
     def _get_pawn_moves(self, q: int, r: int, color: str) -> list:
-        """Get legal pawn moves (forward one hex, capture diagonally forward)."""
+        """Get legal pawn moves (Gliński's hexagonal chess rules).
+        
+        Pawns move straight forward (in ONE direction only) without capturing.
+        They capture obliquely forward to adjacent hexes (in rook/orthogonal directions).
+        Pawns can move 2 spaces ONLY from their exact initial starting position.
+        
+        White pawns move toward negative r (toward black's side).
+        Black pawns move toward positive r (toward white's side).
+        """
         moves = []
         
-        # Pawns move "forward" toward opponent
-        # White moves toward negative r, black moves toward positive r
+        # Define exact starting positions for each pawn based on initial setup
+        white_pawn_starts = [
+            (-4, 5), (-3, 4), (-2, 3), (-1, 2), (0, 1),
+            (1, 1), (2, 1), (3, 1), (4, 1)
+        ]
+        black_pawn_starts = [
+            (4, -5), (3, -4), (2, -3), (1, -2), (0, -1),
+            (-1, -1), (-2, -1), (-3, -1), (-4, -1)
+        ]
+        
+        # Determine forward direction and check if at exact starting position
         if color == "white":
-            # Forward moves (3 directions toward black side)
-            forward_dirs = [(0, -1), (1, -1), (-1, 0)]
-            # Capture diagonally forward
-            capture_dirs = [(1, -1), (-1, 0)]
+            # White moves straight forward: toward negative r
+            forward_dir = (0, -1)
+            # Check if this pawn is at its EXACT starting position
+            is_starting_position = (q, r) in white_pawn_starts
+            # Capture directions: obliquely forward (adjacent hexes in rook directions)
+            capture_dirs = [(-1, 0), (1, -1)]
         else:
-            # Black moves opposite
-            forward_dirs = [(0, 1), (-1, 1), (1, 0)]
-            capture_dirs = [(-1, 1), (1, 0)]
+            # Black moves straight forward: toward positive r
+            forward_dir = (0, 1)
+            # Check if this pawn is at its EXACT starting position
+            is_starting_position = (q, r) in black_pawn_starts
+            # Capture directions: obliquely forward
+            capture_dirs = [(1, 0), (-1, 1)]
         
-        # Forward move (only if empty)
-        for dq, dr in forward_dirs:
-            nq, nr = q + dq, r + dr
-            target = self.get_tile(nq, nr)
-            if target and not target.has_piece():
-                moves.append((nq, nr))
+        # Single step forward (only if empty)
+        nq, nr = q + forward_dir[0], r + forward_dir[1]
+        target = self.get_tile(nq, nr)
+        if target and not target.has_piece():
+            moves.append((nq, nr))
+            
+            # Two-step initial move (only if first move is clear AND at exact starting position)
+            if is_starting_position:
+                nq2, nr2 = q + forward_dir[0] * 2, r + forward_dir[1] * 2
+                target2 = self.get_tile(nq2, nr2)
+                if target2 and not target2.has_piece():
+                    moves.append((nq2, nr2))
         
-        # Capture moves (only if enemy piece)
+        # Capture moves (obliquely forward - orthogonal/rook directions only)
         for dq, dr in capture_dirs:
             nq, nr = q + dq, r + dr
             target = self.get_tile(nq, nr)
@@ -203,42 +247,47 @@ class HexBoard:
         return moves
     
     def _get_knight_moves(self, q: int, r: int, color: str) -> list:
-        """Get legal knight moves (one diagonal + one straight outward = 12 circular positions).
+        """Get legal knight moves (Gliński's rules).
         
-        Knight movement: Move one field diagonally (to same color), then one field 
-        straight outward. This creates 12 destination fields in a circular pattern.
+        Knight moves in an 'L' shape: 
+        - Two spaces in one orthogonal direction
+        - Then one space in an adjacent orthogonal direction (60° angle)
+        - Jumps over intervening pieces
         """
         moves = []
-        current_tile = self.get_tile(q, r)
-        if not current_tile:
-            return moves
         
-        # Knight moves: one diagonal (same color) + one straight outward
-        # There are 6 diagonal directions and from each, 2 outward directions
-        
-        # Pattern: (diagonal_dq, diagonal_dr) -> [(out_dq1, out_dr1), (out_dq2, out_dr2)]
-        knight_patterns = [
-            # From (1,1) diagonal, go out in two directions
-            ((1, 1), [(1, 0), (0, 1)]),       # -> (2,1), (1,2)
-            # From (-1,-1) diagonal
-            ((-1, -1), [(-1, 0), (0, -1)]),   # -> (-2,-1), (-1,-2)
-            # From (2,-1) diagonal
-            ((2, -1), [(1, 0), (1, -1)]),     # -> (3,-1), (3,-2)
-            # From (-2,1) diagonal
-            ((-2, 1), [(-1, 0), (-1, 1)]),    # -> (-3,1), (-3,2)
-            # From (1,-2) diagonal
-            ((1, -2), [(0, -1), (1, -1)]),    # -> (1,-3), (2,-3)
-            # From (-1,2) diagonal
-            ((-1, 2), [(0, 1), (-1, 1)]),     # -> (-1,3), (-2,3)
+        # Six orthogonal directions for the initial 2-step move
+        orthogonal_dirs = [
+            (1, 0), (-1, 0),      # Along q-axis
+            (0, 1), (0, -1),      # Along r-axis
+            (1, -1), (-1, 1)      # Along s-axis
         ]
         
-        for (diag_dq, diag_dr), out_dirs in knight_patterns:
-            for out_dq, out_dr in out_dirs:
-                # Final position: diagonal + outward
-                nq = q + diag_dq + out_dq
-                nr = r + diag_dr + out_dr
-                
+        # For each direction, move 2 steps, then 1 step in adjacent directions
+        for dq, dr in orthogonal_dirs:
+            # Move 2 steps in this direction
+            mid_q, mid_r = q + 2*dq, r + 2*dr
+            
+            # Find the two adjacent orthogonal directions (60° angles)
+            # For each base direction, there are 2 adjacent orthogonal directions
+            if (dq, dr) == (1, 0):      # +q direction
+                perpendicular = [(0, 1), (1, -1)]
+            elif (dq, dr) == (-1, 0):   # -q direction
+                perpendicular = [(0, -1), (-1, 1)]
+            elif (dq, dr) == (0, 1):    # +r direction
+                perpendicular = [(-1, 1), (1, 0)]
+            elif (dq, dr) == (0, -1):   # -r direction
+                perpendicular = [(1, -1), (-1, 0)]
+            elif (dq, dr) == (1, -1):   # +s direction (q+1, r-1)
+                perpendicular = [(1, 0), (0, -1)]
+            else:  # (-1, 1)            # -s direction (q-1, r+1)
+                perpendicular = [(-1, 0), (0, 1)]
+            
+            # Try both perpendicular directions
+            for pq, pr in perpendicular:
+                nq, nr = mid_q + pq, mid_r + pr
                 target = self.get_tile(nq, nr)
+                
                 if target:
                     if not target.has_piece():
                         moves.append((nq, nr))
@@ -275,11 +324,10 @@ class HexBoard:
         return moves
     
     def _get_bishop_moves(self, q: int, r: int, color: str) -> list:
-        """Get legal bishop moves (along same-colored diagonal lines).
+        """Get legal bishop moves.
         
-        In hex chess, bishops move along their color. Since we use 3-coloring
-        based on (q - r) mod 3, bishops move in directions that preserve this value.
-        The three color-preserving diagonal directions are based on the color index.
+        Bishops move along diagonals of the same color.
+        In 3-colored hexagonal chess, bishops stay on their color.
         """
         moves = []
         current_tile = self.get_tile(q, r)
@@ -288,18 +336,11 @@ class HexBoard:
         
         target_color = current_tile.color
         
-        # Bishops move along lines of same color
-        # For 3-coloring with (q - r) mod 3, same color means (q - r) stays constant mod 3
-        # This gives us 3 main diagonal directions
-        
-        # Direction 1: Move along q-r constant (diagonal)
+        # Six diagonal directions that preserve color in 3-coloring
         diagonal_dirs = [
-            (1, 1),   # q+1, r+1 keeps q-r same
-            (-1, -1), # q-1, r-1 keeps q-r same
-            (2, -1),  # q+2, r-1 changes q-r by 3
-            (-2, 1),  # q-2, r+1 changes q-r by -3
-            (1, -2),  # q+1, r-2 changes q-r by 3
-            (-1, 2),  # q-1, r+2 changes q-r by -3
+            (1, 1), (-1, -1),     # Main diagonal
+            (2, -1), (-2, 1),     # Second diagonal  
+            (1, -2), (-1, 2)      # Third diagonal
         ]
         
         for dq, dr in diagonal_dirs:
@@ -328,18 +369,23 @@ class HexBoard:
         return moves
     
     def _get_rook_moves(self, q: int, r: int, color: str) -> list:
-        """Get legal rook moves (6 orthogonal/straight directions)."""
-        # Rooks move in 6 straight lines (the 6 neighbor directions)
+        """Get legal rook moves.
+        
+        Rooks move in straight lines along the 6 hex directions.
+        """
+        # Rooks move in 6 straight orthogonal directions
         orthogonal_dirs = [
-            (1, 0), (-1, 0),    # Along q-axis
-            (0, 1), (0, -1),    # Along r-axis
-            (1, -1), (-1, 1)    # Along s-axis (where s = -q - r)
+            (1, 0), (-1, 0),      # Along q-axis
+            (0, 1), (0, -1),      # Along r-axis
+            (1, -1), (-1, 1)      # Along s-axis (where s = -q - r)
         ]
         return self._get_sliding_moves(q, r, color, orthogonal_dirs)
     
     def _get_queen_moves(self, q: int, r: int, color: str) -> list:
-        """Get legal queen moves (combination of rook + bishop moves)."""
-        # Queen combines both rook and bishop movements
+        """Get legal queen moves.
+        
+        Queen combines rook and bishop movements.
+        """
         rook_moves = self._get_rook_moves(q, r, color)
         bishop_moves = self._get_bishop_moves(q, r, color)
         
@@ -348,12 +394,11 @@ class HexBoard:
         return all_moves
     
     def _get_king_moves(self, q: int, r: int, color: str) -> list:
-        """Get legal king moves (one hex in any of 12 directions: 6 rook + 6 bishop).
+        """Get legal king moves.
         
-        The king can move to:
-        - 6 adjacent fields (rook directions) - share an edge
-        - 6 diagonally adjacent same-colored fields (bishop directions) - share a vertex
-        Total: 12 possible moves
+        King moves one hex in any direction:
+        - 6 orthogonal directions (rook-like)
+        - 6 diagonal directions to same-colored hexes (bishop-like)
         """
         moves = []
         current_tile = self.get_tile(q, r)
@@ -362,39 +407,22 @@ class HexBoard:
         
         target_color = current_tile.color
         
-        # Rook directions (6 orthogonal neighbors - share an edge)
-        rook_dirs = [
-            (1, 0), (-1, 0),    # Along q-axis
-            (0, 1), (0, -1),    # Along r-axis
-            (1, -1), (-1, 1)    # Along s-axis
+        # Orthogonal (rook-like) - one step
+        orthogonal_dirs = [
+            (1, 0), (-1, 0),
+            (0, 1), (0, -1),
+            (1, -1), (-1, 1)
         ]
         
-        # Bishop directions (6 diagonal same-color adjacent - share a vertex)
-        # These are the 12 hexes around that share only a corner with current hex
-        # But we only want the 6 that are same color
-        all_second_ring = [
-            (2, 0), (-2, 0),      # Along q-axis (distance 2)
-            (0, 2), (0, -2),      # Along r-axis (distance 2)
-            (2, -2), (-2, 2),     # Along s-axis (distance 2)
-            (1, 1), (-1, -1),     # Diagonal pairs
-            (2, -1), (-2, 1),     
+        # Diagonal (bishop-like) - one step to same color
+        diagonal_dirs = [
+            (1, 1), (-1, -1),
+            (2, -1), (-2, 1),
             (1, -2), (-1, 2)
         ]
         
-        # Find which of the surrounding hexes are same color and adjacent diagonally
-        bishop_moves = []
-        for dq, dr in all_second_ring:
-            nq, nr = q + dq, r + dr
-            target = self.get_tile(nq, nr)
-            if target and target.color == target_color:
-                # Check if it's truly adjacent (shares a vertex, not an edge)
-                # Distance should be sqrt(3) in hex coordinates
-                # For same color diagonal adjacents, we want specific patterns
-                if (dq, dr) in [(1, 1), (-1, -1), (2, -1), (-2, 1), (1, -2), (-1, 2)]:
-                    bishop_moves.append((dq, dr))
-        
-        # Check all rook directions (always valid if tile exists)
-        for dq, dr in rook_dirs:
+        # Check orthogonal moves
+        for dq, dr in orthogonal_dirs:
             nq, nr = q + dq, r + dr
             target = self.get_tile(nq, nr)
             
@@ -406,12 +434,12 @@ class HexBoard:
                     if enemy_color != color:
                         moves.append((nq, nr))
         
-        # Check valid bishop directions
-        for dq, dr in bishop_moves:
+        # Check diagonal moves (only to same color)
+        for dq, dr in diagonal_dirs:
             nq, nr = q + dq, r + dr
             target = self.get_tile(nq, nr)
             
-            if target:
+            if target and target.color == target_color:
                 if not target.has_piece():
                     moves.append((nq, nr))
                 else:

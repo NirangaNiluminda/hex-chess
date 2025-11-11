@@ -38,6 +38,9 @@ def setup_initial_board(board: HexBoard):
     for tile in board.tiles.values():
         tile.remove_piece()
     
+    # Reset turn to white
+    board.current_turn = "white"
+    
     # WHITE pieces
     board.place_piece(1, 4, "white", "king")
     board.place_piece(-1, 5, "white", "queen")
@@ -138,6 +141,7 @@ def main():
     # Font for info
     font = pygame.font.Font(None, 24)
     small_font = pygame.font.Font(None, 18)
+    turn_font = pygame.font.Font(None, 32)
     
     running = True
     while running:
@@ -168,17 +172,23 @@ def main():
                 elif hovered_coord:
                     tile = board.get_tile(*hovered_coord)
                     if tile and tile.has_piece():
-                        selected_tile = hovered_coord
-                        dragging = True
-                        drag_piece = tile.get_piece()
-                        # Calculate legal moves for this piece
-                        legal_moves = board.get_legal_moves(*hovered_coord)
+                        piece_color, _ = tile.get_piece()
+                        # Only allow selecting pieces of the current turn
+                        if piece_color == board.current_turn:
+                            selected_tile = hovered_coord
+                            dragging = True
+                            drag_piece = tile.get_piece()
+                            # Calculate legal moves for this piece
+                            legal_moves = board.get_legal_moves(*hovered_coord)
             elif event.type == pygame.MOUSEBUTTONUP:
+                move_made = False
                 if dragging and selected_tile and hovered_coord:
                     # Only move if destination is a legal move
                     if hovered_coord in legal_moves:
-                        board.move_piece(selected_tile[0], selected_tile[1], 
+                        move_made = board.move_piece(selected_tile[0], selected_tile[1], 
                                        hovered_coord[0], hovered_coord[1])
+                
+                # Always clear selection after mouse release
                 dragging = False
                 selected_tile = None
                 drag_piece = None
@@ -229,11 +239,26 @@ def main():
                 rect = piece_image.get_rect(center=mouse_pos)
                 screen.blit(piece_image, rect)
         
+        # Draw current turn indicator (top center)
+        turn_text = turn_font.render(f"Turn: {board.current_turn.upper()}", True, (0, 0, 0))
+        turn_bg_rect = turn_text.get_rect(center=(window_w // 2, 25))
+        turn_bg_rect.inflate_ip(20, 10)
+        
+        # Draw background for turn indicator
+        turn_color = (240, 240, 240) if board.current_turn == "white" else (80, 80, 80)
+        text_color = (0, 0, 0) if board.current_turn == "white" else (255, 255, 255)
+        pygame.draw.rect(screen, turn_color, turn_bg_rect, border_radius=5)
+        pygame.draw.rect(screen, (0, 0, 0), turn_bg_rect, 2, border_radius=5)
+        
+        turn_text = turn_font.render(f"Turn: {board.current_turn.upper()}", True, text_color)
+        turn_text_rect = turn_text.get_rect(center=(window_w // 2, 25))
+        screen.blit(turn_text, turn_text_rect)
+        
         # Draw info text
-        text = font.render(f"Hexagonal Board: {BOARD_SIZE} per side", True, (0, 0, 0))
+        text = font.render(f"Hexagonal Chess - Gliński's Variant", True, (0, 0, 0))
         screen.blit(text, (10, 10))
         
-        info_text = small_font.render("Click and drag pieces to move them", True, (0, 0, 0))
+        info_text = small_font.render("Click and drag pieces to move", True, (0, 0, 0))
         screen.blit(info_text, (10, 35))
         
         if hovered_coord:
