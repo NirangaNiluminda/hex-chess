@@ -448,3 +448,143 @@ class HexBoard:
                         moves.append((nq, nr))
         
         return moves
+    
+    def find_king(self, color: str) -> Optional[Tuple[int, int]]:
+        """Find the position of a king of the given color."""
+        for (q, r), tile in self.tiles.items():
+            if tile.has_piece():
+                piece_color, piece_name = tile.get_piece()
+                if piece_color == color and piece_name == "king":
+                    return (q, r)
+        return None
+    
+    def is_square_attacked(self, q: int, r: int, by_color: str) -> bool:
+        """Check if a square is attacked by any piece of the given color."""
+        # Check all tiles for enemy pieces that can attack this square
+        for (pq, pr), tile in self.tiles.items():
+            if not tile.has_piece():
+                continue
+            
+            piece_color, piece_name = tile.get_piece()
+            if piece_color != by_color:
+                continue
+            
+            # Get moves for this piece (temporarily)
+            possible_moves = []
+            if piece_name == "pawn":
+                # For pawns, only check capture moves
+                if piece_color == "white":
+                    capture_dirs = [(-1, 0), (1, -1)]
+                else:
+                    capture_dirs = [(1, 0), (-1, 1)]
+                
+                for dq, dr in capture_dirs:
+                    nq, nr = pq + dq, pr + dr
+                    if (nq, nr) == (q, r):
+                        return True
+            elif piece_name == "knight":
+                possible_moves = self._get_knight_moves(pq, pr, piece_color)
+            elif piece_name == "bishop":
+                possible_moves = self._get_bishop_moves(pq, pr, piece_color)
+            elif piece_name == "rook":
+                possible_moves = self._get_rook_moves(pq, pr, piece_color)
+            elif piece_name == "queen":
+                possible_moves = self._get_queen_moves(pq, pr, piece_color)
+            elif piece_name == "king":
+                possible_moves = self._get_king_moves(pq, pr, piece_color)
+            
+            if (q, r) in possible_moves:
+                return True
+        
+        return False
+    
+    def is_in_check(self, color: str) -> bool:
+        """Check if the king of the given color is in check."""
+        king_pos = self.find_king(color)
+        if not king_pos:
+            return False
+        
+        enemy_color = "black" if color == "white" else "white"
+        return self.is_square_attacked(king_pos[0], king_pos[1], enemy_color)
+    
+    def simulate_move(self, from_q: int, from_r: int, to_q: int, to_r: int) -> bool:
+        """Simulate a move and check if it leaves the king in check.
+        Returns True if the move is valid (doesn't leave king in check)."""
+        from_tile = self.get_tile(from_q, from_r)
+        to_tile = self.get_tile(to_q, to_r)
+        
+        if not from_tile or not to_tile or not from_tile.has_piece():
+            return False
+        
+        # Save the state
+        moving_piece = from_tile.piece
+        captured_piece = to_tile.piece
+        piece_color, _ = moving_piece
+        
+        # Make the move temporarily
+        to_tile.piece = moving_piece
+        from_tile.piece = None
+        
+        # Check if king is in check
+        in_check = self.is_in_check(piece_color)
+        
+        # Restore the state
+        from_tile.piece = moving_piece
+        to_tile.piece = captured_piece
+        
+        return not in_check
+    
+    def get_legal_moves_with_check(self, q: int, r: int) -> list:
+        """Get legal moves that don't leave the king in check."""
+        raw_moves = self.get_legal_moves(q, r)
+        legal_moves = []
+        
+        for move_q, move_r in raw_moves:
+            if self.simulate_move(q, r, move_q, move_r):
+                legal_moves.append((move_q, move_r))
+        
+        return legal_moves
+    
+    def has_any_legal_moves(self, color: str) -> bool:
+        """Check if a color has any legal moves."""
+        for (q, r), tile in self.tiles.items():
+            if not tile.has_piece():
+                continue
+            
+            piece_color, _ = tile.get_piece()
+            if piece_color != color:
+                continue
+            
+            # Check if this piece has any legal moves
+            moves = self.get_legal_moves_with_check(q, r)
+            if moves:
+                return True
+        
+        return False
+    
+    def is_checkmate(self, color: str) -> bool:
+        """Check if the given color is in checkmate."""
+        return self.is_in_check(color) and not self.has_any_legal_moves(color)
+    
+    def is_stalemate(self, color: str) -> bool:
+        """Check if the given color is in stalemate."""
+        return not self.is_in_check(color) and not self.has_any_legal_moves(color)
+    
+    def get_game_status(self) -> str:
+        """Get the current game status.
+        Returns: 'check', 'checkmate', 'stalemate', 'draw', or 'active'
+        """
+        current_color = self.current_turn
+        
+        if self.is_checkmate(current_color):
+            return 'checkmate'
+        
+        if self.is_stalemate(current_color):
+            return 'stalemate'
+        
+        if self.is_in_check(current_color):
+            return 'check'
+        
+        # TODO: Add draw by repetition, 50-move rule, insufficient material
+        
+        return 'active'

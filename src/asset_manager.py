@@ -9,7 +9,7 @@ class PieceImageManager:
     Accepts a hex_radius so images can be scaled to the board size.
     """
     
-    def __init__(self, assets_folder: str = "assets", hex_radius: int = 40):
+    def __init__(self, assets_folder: str = "../assets", hex_radius: int = 40):
         self.assets_folder = assets_folder
         self.hex_radius = hex_radius
         self.images: Dict[Tuple[str, str], pygame.Surface] = {}

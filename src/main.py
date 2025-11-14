@@ -178,8 +178,8 @@ def main():
                             selected_tile = hovered_coord
                             dragging = True
                             drag_piece = tile.get_piece()
-                            # Calculate legal moves for this piece
-                            legal_moves = board.get_legal_moves(*hovered_coord)
+                            # Calculate legal moves for this piece (check-aware)
+                            legal_moves = board.get_legal_moves_with_check(*hovered_coord)
             elif event.type == pygame.MOUSEBUTTONUP:
                 move_made = False
                 if dragging and selected_tile and hovered_coord:
@@ -277,6 +277,36 @@ def main():
         # Show keyboard shortcut hint
         hint_text = small_font.render("Press R to reset", True, (100, 100, 100))
         screen.blit(hint_text, (window_w - 120, button_y + button_height + 5))
+        
+        # Get and display game status
+        game_status = board.get_game_status()
+        status_y = window_h - 40
+        
+        if game_status == 'check':
+            status_text = turn_font.render("CHECK!", True, (200, 0, 0))
+            status_rect = status_text.get_rect(center=(window_w // 2, status_y))
+            # Draw background
+            bg_rect = status_rect.inflate(20, 10)
+            pygame.draw.rect(screen, (255, 255, 200), bg_rect, border_radius=5)
+            pygame.draw.rect(screen, (200, 0, 0), bg_rect, 2, border_radius=5)
+            screen.blit(status_text, status_rect)
+        elif game_status == 'checkmate':
+            winner = "BLACK" if board.current_turn == "white" else "WHITE"
+            status_text = turn_font.render(f"CHECKMATE! {winner} WINS!", True, (200, 0, 0))
+            status_rect = status_text.get_rect(center=(window_w // 2, status_y))
+            # Draw background
+            bg_rect = status_rect.inflate(20, 10)
+            pygame.draw.rect(screen, (255, 200, 200), bg_rect, border_radius=5)
+            pygame.draw.rect(screen, (200, 0, 0), bg_rect, 3, border_radius=5)
+            screen.blit(status_text, status_rect)
+        elif game_status == 'stalemate':
+            status_text = turn_font.render("STALEMATE! DRAW!", True, (100, 100, 100))
+            status_rect = status_text.get_rect(center=(window_w // 2, status_y))
+            # Draw background
+            bg_rect = status_rect.inflate(20, 10)
+            pygame.draw.rect(screen, (220, 220, 220), bg_rect, border_radius=5)
+            pygame.draw.rect(screen, (100, 100, 100), bg_rect, 3, border_radius=5)
+            screen.blit(status_text, status_rect)
         
         pygame.display.flip()
         clock.tick(60)
