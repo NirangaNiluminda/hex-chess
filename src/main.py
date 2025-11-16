@@ -15,6 +15,7 @@ def setup_initial_board(board: HexBoard):
     # Reset turn to white
     board.current_turn = "white"
     board.en_passant_target = None
+    board.pending_promotion = None
     
     # WHITE pieces
     board.place_piece(1, 4, "white", "king")
@@ -65,6 +66,10 @@ def main():
     margin = 80
     avail_w = max(300, info.current_w - margin) if info.current_w else WINDOW_WIDTH
     avail_h = max(300, info.current_h - margin) if info.current_h else WINDOW_HEIGHT
+
+    promotion_pieces = ["queen", "rook", "bishop", "knight"]
+    promotion_button_size = 60
+    promotion_buttons = {}
 
     # Create a temporary board with the default radius to compute how many pixels it needs
     temp_board = HexBoard(BOARD_SIZE, HEX_RADIUS)
@@ -137,10 +142,23 @@ def main():
         undo_hover = undo_button_rect.collidepoint(mouse_pos)
         flip_hover = flip_button_rect.collidepoint(mouse_pos)
 
+        # Check promotion button hover
+        promotion_hover = None
+        if board.pending_promotion:
+            for piece, rect in promotion_buttons.items():
+                if rect.collidepoint(mouse_pos):
+                    promotion_hover = piece
+                    break
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Handle promotion choice first
+                if board.pending_promotion and promotion_hover:
+                    board.promote_pawn(promotion_hover)
+                    promotion_buttons = {}
+                    continue
                 # check if reset button was clicked
                 if reset_hover:
                     setup_initial_board(board)
@@ -196,11 +214,25 @@ def main():
         # Clear screen
         screen.fill(BACKGROUND)
         
+        # Calculate promotion button positions if needed
+        if board.pending_promotion:
+            q, r, color = board.pending_promotion
+            total_width = len(promotion_pieces) * (promotion_button_size + 10) - 10
+            start_x = (window_w - total_width) // 2
+            start_y = window_h // 2 - promotion_button_size // 2
+            
+            promotion_buttons = {}
+            for i, piece in enumerate(promotion_pieces):
+                x = start_x + i * (promotion_button_size + 10)
+                promotion_buttons[piece] = pygame.Rect(x, start_y, 
+                                                       promotion_button_size, 
+                                                       promotion_button_size)
+                
         # Draw all hexagons and pieces
         renderer.render(screen, center_x, center_y, mouse_pos, hovered_coord,
                 selected_tile, dragging, drag_piece, legal_moves,
                 reset_button_rect, undo_button_rect, flip_button_rect,
-                reset_hover, undo_hover, flip_hover, history)
+                reset_hover, undo_hover, flip_hover, history,promotion_buttons, promotion_hover)
         
         clock.tick(60)
     

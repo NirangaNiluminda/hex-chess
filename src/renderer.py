@@ -47,7 +47,7 @@ class Renderer:
     def render(self, screen, center_x, center_y, mouse_pos, hovered_coord,
                selected_tile, dragging, drag_piece, legal_moves,
                reset_button_rect, undo_button_rect, flip_button_rect,
-               reset_hover, undo_hover, flip_hover, history):
+               reset_hover, undo_hover, flip_hover, history,promotion_buttons=None, promotion_hover=None):
         # Clear screen
         screen.fill(BACKGROUND)
 
@@ -220,5 +220,36 @@ class Renderer:
         eval_text = self.small_font.render(f"{int(score):+d}", True, eval_color)
         eval_rect = eval_text.get_rect(center=(bar_x + bar_width // 2, bar_y - 12))
         screen.blit(eval_text, eval_rect)
+
+         # Draw promotion dialog if needed
+        if self.board.pending_promotion and promotion_buttons:
+            # Draw semi-transparent overlay
+            overlay = pygame.Surface((self.window_w, self.window_h), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            screen.blit(overlay, (0, 0))
+            
+            # Draw promotion title
+            q, r, color = self.board.pending_promotion
+            title_text = self.turn_font.render("Choose Promotion Piece", True, (255, 255, 255))
+            title_rect = title_text.get_rect(center=(self.window_w // 2, self.window_h // 2 - 80))
+            screen.blit(title_text, title_rect)
+            
+            # Draw promotion buttons
+            for piece, rect in promotion_buttons.items():
+                # Button background
+                button_color = (100, 150, 250) if piece == promotion_hover else (70, 120, 200)
+                pygame.draw.rect(screen, button_color, rect, border_radius=5)
+                pygame.draw.rect(screen, (255, 255, 255), rect, 3, border_radius=5)
+                
+                # Draw piece image
+                piece_image = self.piece_manager.get_image(color, piece)
+                if piece_image:
+                    img_rect = piece_image.get_rect(center=rect.center)
+                    screen.blit(piece_image, img_rect)
+                else:
+                    # Fallback text if image not available
+                    piece_text = self.small_font.render(piece.upper(), True, (255, 255, 255))
+                    text_rect = piece_text.get_rect(center=rect.center)
+                    screen.blit(piece_text, text_rect)
 
         pygame.display.flip()

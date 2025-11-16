@@ -40,6 +40,7 @@ class HexBoard:
         self.current_turn = "white"  # Track whose turn it is
         self.flipped = False
         self.en_passant_target = None
+        self.pending_promotion = None
         self._generate_tiles()
         self.move_generator = MoveGenerator(self)
         
@@ -166,6 +167,11 @@ class HexBoard:
         to_tile.piece = from_tile.piece
         from_tile.remove_piece()
         
+        # Check for pawn promotion - ADD THIS BLOCK
+        if piece_name == "pawn" and self.is_promotion_square(to_q, to_r, piece_color):
+            self.pending_promotion = (to_q, to_r, piece_color)
+            # Don't switch turns yet - wait for promotion choice
+            return True
         # Switch turns
         self.current_turn = "black" if self.current_turn == "white" else "white"
         return True
@@ -198,3 +204,43 @@ class HexBoard:
     def toggle_flip(self):
         """Toggle the visual flipped state of the board."""
         self.flipped = not self.flipped
+    
+    def is_promotion_square(self, q: int, r: int, color: str) -> bool:
+        """Check if a square is in the promotion zone for the given color."""
+        # White pawns promote on black's back rank
+        if color == "white":
+            # Black's back rank positions
+            black_back_rank = [
+            (4, -5), (3, -5), (2, -5), (1, -5), (0, -5),
+            (-1, -4), (-2, -3), (-3, -2), (-4, -1)
+        ]
+            return (q, r) in black_back_rank
+        else:
+            # Black pawns promote on white's back rank
+            white_back_rank = [
+            (-4, 5), (-3, 5), (-2, 5), (-1, 5), (0, 5),
+            (1, 4), (2, 3), (3, 2), (4, 1)
+            ]
+            return (q, r) in white_back_rank
+    
+    def promote_pawn(self, piece_name: str) -> bool:
+        """Promote the pending pawn to the specified piece."""
+        if not self.pending_promotion:
+            return False
+        
+        q, r, color = self.pending_promotion
+        tile = self.get_tile(q, r)
+        
+        if not tile:
+            return False
+        
+        # Replace pawn with chosen piece
+        tile.set_piece(color, piece_name)
+        
+        # Clear promotion state
+        self.pending_promotion = None
+        
+        # Now switch turns
+        self.current_turn = "black" if self.current_turn == "white" else "white"
+        
+        return True
