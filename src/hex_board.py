@@ -39,6 +39,7 @@ class HexBoard:
         self.tiles: Dict[Tuple[int, int], HexTile] = {}
         self.current_turn = "white"  # Track whose turn it is
         self.flipped = False
+        self.en_passant_target = None
         self._generate_tiles()
         self.move_generator = MoveGenerator(self)
         
@@ -121,12 +122,46 @@ class HexBoard:
         if not from_tile or not to_tile or not from_tile.has_piece() or from_tile == to_tile:
             return False
         
-        piece_color, _ = from_tile.get_piece()
+        piece_color,piece_name = from_tile.get_piece()
         
         # Check if it's this color's turn
         if piece_color != self.current_turn:
             return False
         
+        # Handle en-passant capture
+        if piece_name == "pawn" and (to_q, to_r) == self.en_passant_target:
+        # Remove the captured pawn
+            if piece_color == "white":
+                captured_pawn_pos = (to_q, to_r + 1)  # Black pawn is one square "below"
+            else:
+                captured_pawn_pos = (to_q, to_r - 1)  # White pawn is one square "above"
+        
+            captured_tile = self.get_tile(*captured_pawn_pos)
+            if captured_tile:
+                captured_tile.remove_piece()
+
+        # Clear en-passant target before checking for new two-square pawn moves
+        self.en_passant_target = None
+
+        # Check if this is a two-square pawn move (sets new en-passant target)
+        if piece_name == "pawn":
+            white_pawn_starts = [
+                (-4, 5), (-3, 4), (-2, 3), (-1, 2), (0, 1),
+                (1, 1), (2, 1), (3, 1), (4, 1)
+            ]
+            black_pawn_starts = [
+                (4, -5), (3, -4), (2, -3), (1, -2), (0, -1),
+                (-1, -1), (-2, -1), (-3, -1), (-4, -1)
+            ]
+        
+            if piece_color == "white" and (from_q, from_r) in white_pawn_starts:
+                # Check if moved two squares
+                if to_r == from_r - 2:
+                    self.en_passant_target = (from_q, from_r - 1)
+            elif piece_color == "black" and (from_q, from_r) in black_pawn_starts:
+                # Check if moved two squares
+                if to_r == from_r + 2:
+                    self.en_passant_target = (from_q, from_r + 1)
         # Make the move
         to_tile.piece = from_tile.piece
         from_tile.remove_piece()

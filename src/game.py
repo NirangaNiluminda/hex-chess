@@ -76,7 +76,11 @@ class MoveGenerator:
                 enemy_color, _ = target.get_piece()
                 if enemy_color != color:
                     moves.append((nq, nr))
-
+        if self.board.en_passant_target:
+            for dq, dr in capture_dirs:
+                nq, nr = q + dq, r + dr
+                if (nq, nr) == self.board.en_passant_target:
+                    moves.append((nq, nr))
         return moves
 
     def _get_knight_moves(self, q: int, r: int, color: str):

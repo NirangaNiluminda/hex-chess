@@ -14,6 +14,7 @@ def setup_initial_board(board: HexBoard):
     
     # Reset turn to white
     board.current_turn = "white"
+    board.en_passant_target = None
     
     # WHITE pieces
     board.place_piece(1, 4, "white", "king")
