@@ -47,8 +47,8 @@ class Renderer:
     def render(self, screen, center_x, center_y, mouse_pos, hovered_coord,
                selected_tile, dragging, drag_piece, legal_moves,
                reset_button_rect, undo_button_rect, flip_button_rect,
-               reset_hover, undo_hover, flip_hover, history,promotion_buttons=None, promotion_hover=None):
-        # Clear screen
+               reset_hover, undo_hover, flip_hover, history, promotion_buttons=None, 
+               promotion_hover=None, ai_button_rect=None, ai_hover=False, ai_thinking=False):
         screen.fill(BACKGROUND)
 
         # Draw all hexagons and pieces
@@ -119,7 +119,7 @@ class Renderer:
         text = self.font.render(f"Hexagonal Chess - Gliński's Variant", True, (0, 0, 0))
         screen.blit(text, (10, 10))
 
-        info_text = self.small_font.render("Click and drag pieces to move", True, (0, 0, 0))
+        info_text = self.small_font.render("Click AI Move or drag pieces", True, (0, 0, 0))
         screen.blit(info_text, (10, 35))
 
         if hovered_coord:
@@ -152,6 +152,21 @@ class Renderer:
         screen.blit(flip_text, flip_text_rect)
 
         # Get and display game status
+        if ai_button_rect:
+            if ai_thinking:
+                ai_color = (255, 165, 0)  # Orange when thinking
+                ai_text_str = "THINKING..."
+            else:
+                ai_color = (100, 200, 250) if ai_hover else (70, 170, 220)
+                ai_text_str = "AI MOVE"
+            
+            pygame.draw.rect(screen, ai_color, ai_button_rect, border_radius=5)
+            pygame.draw.rect(screen, (40, 40, 40), ai_button_rect, 2, border_radius=5)
+            ai_text = self.small_font.render(ai_text_str, True, (255, 255, 255))
+            ai_text_rect = ai_text.get_rect(center=ai_button_rect.center)
+            screen.blit(ai_text, ai_text_rect)
+
+        # Game status
         move_validator = MoveValidator(self.board)
         game_status = move_validator.get_game_status()
         status_y = self.window_h - 40
@@ -193,7 +208,7 @@ class Renderer:
         bar_x = 10
         bar_y = 60
         bar_height = max(80, self.window_h - 140)
-        center_y = bar_y + bar_height / 2
+        center_y_bar = bar_y + bar_height / 2
         half = bar_height / 2
 
         # Bar background and outline
@@ -205,15 +220,14 @@ class Renderer:
         inner_w = bar_width - 4
         if frac > 0:
             fill_h = int(frac * half)
-            fill_rect = pygame.Rect(inner_x, int(center_y - fill_h), inner_w, max(1, fill_h))
+            fill_rect = pygame.Rect(inner_x, int(center_y_bar - fill_h), inner_w, max(1, fill_h))
             pygame.draw.rect(screen, (245, 245, 245), fill_rect, border_radius=4)
         elif frac < 0:
             fill_h = int(-frac * half)
-            fill_rect = pygame.Rect(inner_x, int(center_y), inner_w, max(1, fill_h))
+            fill_rect = pygame.Rect(inner_x, int(center_y_bar), inner_w, max(1, fill_h))
             pygame.draw.rect(screen, (30, 30, 30), fill_rect, border_radius=4)
 
-        # Center neutral marker
-        pygame.draw.line(screen, (0, 0, 0), (bar_x, center_y), (bar_x + bar_width, center_y), 2)
+        pygame.draw.line(screen, (0, 0, 0), (bar_x, center_y_bar), (bar_x + bar_width, center_y_bar), 2)
 
         # Numeric evaluation display above bar
         eval_color = (0, 0, 0) if score >= 0 else (255, 255, 255)

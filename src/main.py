@@ -5,6 +5,8 @@ from hex_board import HexBoard
 from asset_manager import PieceImageManager
 from renderer import Renderer
 from game import MoveValidator
+from engine import ChessEngine
+from search_engine import SearchEngine
 
 def setup_initial_board(board: HexBoard):
     """Set up the initial chess piece positions."""
@@ -113,6 +115,7 @@ def main():
     reset_button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
     undo_button_rect = pygame.Rect(button_x, button_y + button_height + 10, button_width, button_height)
     flip_button_rect = pygame.Rect(button_x, button_y + (button_height + 10) * 2, button_width, button_height)
+    ai_button_rect = pygame.Rect(button_x, button_y + (button_height + 10) * 3, button_width, button_height)
 
     # For piece dragging
     selected_tile = None
@@ -120,6 +123,8 @@ def main():
     drag_piece = None
     legal_moves = []  # Store legal moves for selected piece
     history = [] # store previous board states (deep copies)
+    ai_thinking = False
+    ai_enabled = True  # Toggle this to enable/disable AI
      
     # Font for info
     font = pygame.font.Font(None, 24)
@@ -128,6 +133,7 @@ def main():
 
     renderer = Renderer(board, piece_manager, font, small_font, turn_font, window_w, window_h)
     move_validator = MoveValidator(board)
+    search_engine = SearchEngine(ChessEngine, move_validator)
     
     running = True
     while running:
@@ -141,6 +147,7 @@ def main():
         reset_hover = reset_button_rect.collidepoint(mouse_pos)
         undo_hover = undo_button_rect.collidepoint(mouse_pos)
         flip_hover = flip_button_rect.collidepoint(mouse_pos)
+        ai_hover = ai_button_rect.collidepoint(mouse_pos)
 
         # Check promotion button hover
         promotion_hover = None
@@ -154,6 +161,9 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                if ai_thinking:
+                    continue  # Ignore input while AI is thinking
+                    
                 # Handle promotion choice first
                 if board.pending_promotion and promotion_hover:
                     board.promote_pawn(promotion_hover)
@@ -162,7 +172,6 @@ def main():
                 # check if reset button was clicked
                 if reset_hover:
                     setup_initial_board(board)
-                    # Ensure renderer and move validator reference the same board
                     renderer.board = board
                     move_validator.board = board
                     move_validator.move_generator.board = board
@@ -171,20 +180,24 @@ def main():
                     drag_piece = None
                     legal_moves = []
                     history = []
+                    ai_thinking = False
                 elif undo_hover:
                     if history:
                         board = history.pop()
                         renderer.board = board
-                        # Ensure renderer and move validator reference the same board
-                        renderer.board = board
                         move_validator.board = board
                         move_validator.move_generator.board = board
+                        search_engine.move_validator = move_validator
                         selected_tile = None
                         dragging = False
                         drag_piece = None
                         legal_moves = []
+                        ai_thinking = False
                 elif flip_hover:
                     board.toggle_flip()
+                elif ai_hover and not ai_thinking:
+                    # Trigger AI move
+                    ai_thinking = True
                 elif hovered_coord:
                     tile = board.get_tile(*hovered_coord)
                     if tile and tile.has_piece():
@@ -194,15 +207,15 @@ def main():
                             selected_tile = hovered_coord
                             dragging = True
                             drag_piece = tile.get_piece()
-                            # Calculate legal moves for this piece (check-aware)
                             legal_moves = move_validator.get_legal_moves_with_check(*hovered_coord)
             elif event.type == pygame.MOUSEBUTTONUP:
-                move_made = False
+                if ai_thinking:
+                    continue
+                    
                 if dragging and selected_tile and hovered_coord:
-                    # Only move if destination is a legal move
                     if hovered_coord in legal_moves:
                         history.append(copy.deepcopy(board))
-                        move_made = board.move_piece(selected_tile[0], selected_tile[1], 
+                        board.move_piece(selected_tile[0], selected_tile[1], 
                                        hovered_coord[0], hovered_coord[1])
                 
                 # Always clear selection after mouse release
@@ -210,6 +223,29 @@ def main():
                 selected_tile = None
                 drag_piece = None
                 legal_moves = []  # Clear legal moves
+        
+        # AI move logic (runs in main loop to avoid blocking)
+        if ai_thinking:
+            print(f"AI ({board.current_turn}) is thinking...")
+            
+            # Find best move
+            best_move = search_engine.find_best_move(board, depth=3, max_time=5.0)
+            
+            if best_move:
+                from_pos, to_pos = best_move
+                print(f"AI plays: {from_pos} -> {to_pos}")
+                
+                history.append(copy.deepcopy(board))
+                board.move_piece(from_pos[0], from_pos[1], to_pos[0], to_pos[1])
+                
+                # Auto-promote pawns for AI (always choose Queen)
+                if board.pending_promotion:
+                    print("AI promotes pawn to Queen")
+                    board.promote_pawn('queen')
+            else:
+                print("AI has no legal moves!")
+            
+            ai_thinking = False
         
         # Clear screen
         screen.fill(BACKGROUND)
@@ -232,7 +268,8 @@ def main():
         renderer.render(screen, center_x, center_y, mouse_pos, hovered_coord,
                 selected_tile, dragging, drag_piece, legal_moves,
                 reset_button_rect, undo_button_rect, flip_button_rect,
-                reset_hover, undo_hover, flip_hover, history,promotion_buttons, promotion_hover)
+                reset_hover, undo_hover, flip_hover, history, promotion_buttons, 
+                promotion_hover, ai_button_rect, ai_hover, ai_thinking)
         
         clock.tick(60)
     
