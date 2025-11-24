@@ -1,11 +1,13 @@
 import pygame
 import copy
+import threading
 from constants import *
 from hex_board import HexBoard
 from asset_manager import PieceImageManager
 from renderer import Renderer
 from game import MoveValidator
 from evaluation import Evaluator
+from engine import ChessEngine
 
 def setup_initial_board(board: HexBoard):
     """Set up the initial chess piece positions."""
@@ -99,6 +101,10 @@ def main():
     # Create the hex board and piece manager using the scaled radius
     board = HexBoard(BOARD_SIZE, scaled_radius)
     piece_manager = PieceImageManager(hex_radius=scaled_radius)
+
+    #Initialize chess engine
+    engine_thinking = False
+    chess_engine = ChessEngine(board)
     
     # Set up initial piece positions
     setup_initial_board(board)
@@ -213,6 +219,10 @@ def main():
                 selected_tile = None
                 drag_piece = None
                 legal_moves = []  # Clear legal moves
+
+                # If a move was made and it's now the engine's turn, let the engine play
+                if move_made and board.current_turn == chess_engine.engine_color:
+                    chess_engine.play_best_move()
         
         # Clear screen
         screen.fill(BACKGROUND)
