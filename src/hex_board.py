@@ -252,3 +252,56 @@ class HexBoard:
         self.current_turn = "black" if self.current_turn == "white" else "white"
         
         return True
+
+
+class HexGeometry:
+    """Geometric calculations for hexagonal boards."""
+    
+    @staticmethod
+    def axial_distance(q1: int, r1: int, q2: int, r2: int) -> int:
+        """Calculate distance between two hexagons in axial coordinates."""
+        return (abs(q1 - q2) + abs(q1 + r1 - q2 - r2) + abs(r1 - r2)) // 2
+    
+    @staticmethod
+    def distance_from_center(q: int, r: int) -> int:
+        """Calculate distance from board center (0, 0)."""
+        return HexGeometry.axial_distance(q, r, 0, 0)
+    
+    @staticmethod
+    def distance_from_edge(q: int, r: int, board_size: int = 5) -> int:
+        """Calculate minimum distance to board edge."""
+        s = -q - r
+        max_coord = max(abs(q), abs(r), abs(s))
+        return board_size - 1 - max_coord
+    
+    @staticmethod
+    def get_rank(q: int, r: int, color: str, board_size: int = 5) -> int:
+        """
+        Get the 'rank' (distance from own back rank) for a piece.
+        Returns 0 at back rank, increases toward opponent.
+        
+        We calculate this by finding the maximum r-value on the board
+        and measuring distance from there.
+        """
+        if color == 'white':
+            # White advances by decreasing r
+            # Maximum r for a size-5 board is 4 (at the edges)
+            # But from the actual board data, white pieces go up to r=5
+            # So white's back rank appears to be at r=5
+            # Rank = 5 - r gives: r=5 -> rank 0, r=4 -> rank 1, etc.
+            max_r = board_size  # 5 for size-5 board
+            return max_r - r
+        else:
+            # Black advances by increasing r  
+            # Black's back rank is at r=-5
+            # Rank = 5 + r gives: r=-5 -> rank 0, r=-4 -> rank 1, etc.
+            max_r = board_size  # 5 for size-5 board
+            return max_r + r
+    
+    @staticmethod
+    def get_file_centrality(q: int, board_size: int = 5) -> int:
+        """
+        Get how central the file (q coordinate) is.
+        Returns 0 at edges, higher toward center.
+        """
+        return board_size - 1 - abs(q)

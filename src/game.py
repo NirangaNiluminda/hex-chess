@@ -12,32 +12,6 @@ class MoveGenerator:
     def __init__(self, board):
         self.board = board
 
-    def get_legal_moves(self, q: int, r: int) -> List[Tuple[int, int]]:
-        tile = self.board.get_tile(q, r)
-        if not tile or not tile.has_piece():
-            return []
-
-        piece_color, piece_name = tile.get_piece()
-
-        # Only show legal moves if it's this piece's turn
-        if piece_color != self.board.current_turn:
-            return []
-
-        if piece_name == "pawn":
-            return self._get_pawn_moves(q, r, piece_color)
-        elif piece_name == "knight":
-            return self._get_knight_moves(q, r, piece_color)
-        elif piece_name == "bishop":
-            return self._get_bishop_moves(q, r, piece_color)
-        elif piece_name == "rook":
-            return self._get_rook_moves(q, r, piece_color)
-        elif piece_name == "queen":
-            return self._get_queen_moves(q, r, piece_color)
-        elif piece_name == "king":
-            return self._get_king_moves(q, r, piece_color)
-
-        return []
-
     def _get_pawn_moves(self, q: int, r: int, color: str):
         moves = []
 
@@ -214,6 +188,37 @@ class MoveGenerator:
                         moves.append((nq, nr))
         return moves
 
+class MoveValidator:
+    def __init__(self, board):
+        self.board = board
+        self.move_generator = MoveGenerator(board)
+
+    def get_legal_moves(self, q: int, r: int) -> List[Tuple[int, int]]:
+        tile = self.board.get_tile(q, r)
+        if not tile or not tile.has_piece():
+            return []
+
+        piece_color, piece_name = tile.get_piece()
+
+        # Only show legal moves if it's this piece's turn
+        if piece_color != self.board.current_turn:
+            return []
+
+        if piece_name == "pawn":
+            return self.move_generator._get_pawn_moves(q, r, piece_color)
+        elif piece_name == "knight":
+            return self.move_generator._get_knight_moves(q, r, piece_color)
+        elif piece_name == "bishop":
+            return self.move_generator._get_bishop_moves(q, r, piece_color)
+        elif piece_name == "rook":
+            return self.move_generator._get_rook_moves(q, r, piece_color)
+        elif piece_name == "queen":
+            return self.move_generator._get_queen_moves(q, r, piece_color)
+        elif piece_name == "king":
+            return self.move_generator._get_king_moves(q, r, piece_color)
+
+        return []
+    
     def is_square_attacked(self, q: int, r: int, by_color: str) -> bool:
         for (pq, pr), tile in self.board.tiles.items():
             if not tile.has_piece():
@@ -231,33 +236,20 @@ class MoveGenerator:
                         return True
             else:
                 if piece_name == "knight":
-                    moves = self._get_knight_moves(pq, pr, piece_color)
+                    moves = self.move_generator._get_knight_moves(pq, pr, piece_color)
                 elif piece_name == "bishop":
-                    moves = self._get_bishop_moves(pq, pr, piece_color)
+                    moves = self.move_generator._get_bishop_moves(pq, pr, piece_color)
                 elif piece_name == "rook":
-                    moves = self._get_rook_moves(pq, pr, piece_color)
+                    moves = self.move_generator._get_rook_moves(pq, pr, piece_color)
                 elif piece_name == "queen":
-                    moves = self._get_queen_moves(pq, pr, piece_color)
+                    moves = self.move_generator._get_queen_moves(pq, pr, piece_color)
                 elif piece_name == "king":
-                    moves = self._get_king_moves(pq, pr, piece_color)
+                    moves = self.move_generator._get_king_moves(pq, pr, piece_color)
                 else:
                     moves = []
                 if (q, r) in moves:
                     return True
-        return False
-
-class MoveValidator:
-    def __init__(self, board):
-        self.board = board
-        self.move_generator = MoveGenerator(board)
-
-    def get_legal_moves(self, q: int, r: int) -> list:
-        """Delegate move generation to MoveGenerator."""
-        return self.move_generator.get_legal_moves(q, r)
-    
-    def is_square_attacked(self, q: int, r: int, by_color: str) -> bool:
-        """Delegate attack detection to MoveGenerator."""
-        return self.move_generator.is_square_attacked(q, r, by_color)   
+        return False  
     
     def find_king(self, color: str) -> Optional[Tuple[int, int]]:
         """Find the position of a king of the given color."""
