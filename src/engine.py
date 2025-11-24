@@ -12,6 +12,7 @@ class ChessEngine:
         self.validator = MoveValidator(board)
         self.search_depth = depth
         self.nodes_searched = 0  # For debugging
+        self.transposition_table = {}
 
     def _snapshot_board(self):
         """Return a snapshot of pieces & mutable board state to restore after simulation."""
@@ -90,6 +91,15 @@ class ChessEngine:
         # Sort moves by score (highest first)
         return sorted(moves, key=move_score, reverse=True)
 
+    def _hash_position(self) -> str:
+        """Create a simple hash of the current position."""
+        pieces = []
+        for (q, r), tile in sorted(self.board.tiles.items()):
+            if tile and tile.has_piece():
+                color, piece = tile.get_piece()
+                pieces.append(f"{q},{r},{color},{piece}")
+        return "|".join(pieces) + f"|{self.board.current_turn}"
+
     def _minimax(self, depth: int, is_maximizing: bool, alpha: float = float('-inf'), beta: float = float('inf')) -> float:
         """
         Minimax with alpha-beta pruning.
@@ -97,6 +107,14 @@ class ChessEngine:
         Returns the best evaluation score from current position.
         """
         self.nodes_searched += 1
+        # Create a simple position hash
+        position_key = self._hash_position()
+        
+        # Check transposition table
+        if position_key in self.transposition_table:
+            cached_depth, cached_value = self.transposition_table[position_key]
+            if cached_depth >= depth:
+                return cached_value
 
         # Base case: reached max depth or game over
         if depth == 0:
@@ -149,6 +167,7 @@ class ChessEngine:
                 alpha = max(alpha, eval_score)
                 if beta <= alpha:
                     break # Beta cutoff
+            self.transposition_table[position_key] = (depth, max_eval)
             return max_eval
 
         else:
@@ -172,6 +191,7 @@ class ChessEngine:
                 beta = min(beta, eval_score)
                 if beta <= alpha:
                     break # alpha cutoff
+            self.transposition_table[position_key] = (depth, min_eval)
             return min_eval
 
     def find_best_move(self) -> Optional[Tuple[Tuple[int,int], Tuple[int,int], float]]:
