@@ -106,10 +106,9 @@ def main():
     engine_thinking = False
     chess_engine = ChessEngine(board, depth=COMPUTATION_DEPTH)
     
-    # REASON FOR CHANGE #1: Add delay mechanism for engine move
-    # This ensures visual separation between player and engine moves
-    engine_move_delay = 0  # Counter for frames to wait before engine moves
-    ENGINE_DELAY_FRAMES = 30  # Wait 0.5 seconds at 60fps before engine moves
+    # Add delay for engine move
+    engine_move_delay = 0 
+    ENGINE_DELAY_FRAMES = 1 # Wait 1 frame at 60fps before engine moves
     
     # Set up initial piece positions
     setup_initial_board(board)
@@ -172,8 +171,7 @@ def main():
                 if board.pending_promotion and promotion_hover:
                     board.promote_pawn(promotion_hover)
                     promotion_buttons = {}
-                    # REASON FOR CHANGE #2: Start engine delay after promotion
-                    # Player has completed their turn, now wait before engine responds
+                    # start engine delay after promotion
                     if board.current_turn == chess_engine.engine_color:
                         engine_move_delay = ENGINE_DELAY_FRAMES
                     continue
@@ -189,7 +187,6 @@ def main():
                     drag_piece = None
                     legal_moves = []
                     history = []
-                    # REASON FOR CHANGE #3: Reset engine delay on board reset
                     engine_move_delay = 0
                 elif undo_hover:
                     if history:
@@ -203,7 +200,6 @@ def main():
                         dragging = False
                         drag_piece = None
                         legal_moves = []
-                        # REASON FOR CHANGE #4: Reset engine delay on undo
                         engine_move_delay = 0
                 elif flip_hover:
                     board.toggle_flip()
@@ -233,14 +229,11 @@ def main():
                 drag_piece = None
                 legal_moves = []  # Clear legal moves
 
-                # REASON FOR CHANGE #5: Start delay timer instead of immediate engine move
-                # This allows the player's move to be visually completed before engine responds
+                # start delay timer instead of immediate engine move
                 if move_made and board.current_turn == chess_engine.engine_color:
                     engine_move_delay = ENGINE_DELAY_FRAMES
         
-        # REASON FOR CHANGE #6: Implement delayed engine move
         # Only trigger engine move after delay has elapsed
-        # This creates clear visual separation between player and engine turns
         if engine_move_delay > 0:
             engine_move_delay -= 1
             if engine_move_delay == 0:
