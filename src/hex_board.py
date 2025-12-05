@@ -307,31 +307,7 @@ class HexGeometry:
         s = -q - r
         max_coord = max(abs(q), abs(r), abs(s))
         return board_size - 1 - max_coord
-    
-    @staticmethod
-    def get_rank(q: int, r: int, color: str, board_size: int = 5) -> int:
-        """
-        Get the 'rank' (distance from own back rank) for a piece.
-        Returns 0 at back rank, increases toward opponent.
-        
-        We calculate this by finding the maximum r-value on the board
-        and measuring distance from there.
-        """
-        if color == 'white':
-            # White advances by decreasing r
-            # Maximum r for a size-5 board is 4 (at the edges)
-            # But from the actual board data, white pieces go up to r=5
-            # So white's back rank appears to be at r=5
-            # Rank = 5 - r gives: r=5 -> rank 0, r=4 -> rank 1, etc.
-            max_r = board_size  # 5 for size-5 board
-            return max_r - r
-        else:
-            # Black advances by increasing r  
-            # Black's back rank is at r=-5
-            # Rank = 5 + r gives: r=-5 -> rank 0, r=-4 -> rank 1, etc.
-            max_r = board_size  # 5 for size-5 board
-            return max_r + r
-    
+
     @staticmethod
     def get_file_centrality(q: int, board_size: int = 5) -> int:
         """
