@@ -130,6 +130,7 @@ async def main():
     dragging = False
     drag_piece = None
     legal_moves = []  # Store legal moves for selected piece
+    last_move = None  # Will store (from_q, from_r, to_q, to_r)
     
     # only store move data
     history = []  # List of tuples: (from_q, from_r, to_q, to_r, move_info_dict)
@@ -144,7 +145,7 @@ async def main():
     
     async def make_engine_move():
         """Async wrapper for engine move to prevent blocking."""
-        nonlocal engine_thinking, flip_locked
+        nonlocal engine_thinking, flip_locked, last_move
         engine_thinking = True
         flip_locked = True
         
@@ -165,6 +166,9 @@ async def main():
         # Apply the best move to the DISPLAY board (not engine board)
         if best_move:
             (from_q, from_r), (to_q, to_r), value = best_move
+            # Store the engine's move for highlighting
+            last_move = (from_q, from_r, to_q, to_r)
+            
             # Capture move info before making the move
             move_info = board.capture_move_info(from_q, from_r, to_q, to_r)
             
@@ -227,6 +231,7 @@ async def main():
                     drag_piece = None
                     legal_moves = []
                     history = []
+                    last_move = None
                     flip_locked = False
                 elif undo_hover and not engine_thinking:
                     if history:
@@ -241,6 +246,7 @@ async def main():
                         dragging = False
                         drag_piece = None
                         legal_moves = []
+                        last_move = None
                 elif flip_hover:
                     board.toggle_flip()
                 elif hovered_coord and not engine_thinking:
@@ -260,6 +266,8 @@ async def main():
                 if dragging and selected_tile and hovered_coord and not engine_thinking:
                     # Only move if destination is a legal move
                     if hovered_coord in legal_moves:
+                        # Clear last move highlight when player makes a move
+                        last_move = None                    
                         # Capture move info before making the move
                         move_info = board.capture_move_info(selected_tile[0], selected_tile[1],
                                                             hovered_coord[0], hovered_coord[1])
@@ -304,7 +312,7 @@ async def main():
         renderer.render(screen, center_x, center_y, mouse_pos, hovered_coord,
                 selected_tile, dragging, drag_piece, legal_moves,
                 reset_button_rect, undo_button_rect, flip_button_rect,
-                reset_hover, undo_hover, flip_hover, history,promotion_buttons, promotion_hover, flip_locked)
+                reset_hover, undo_hover, flip_hover, history, promotion_buttons,promotion_hover, flip_locked, last_move, engine_thinking)
         
         pygame.display.flip()
         clock.tick(60)

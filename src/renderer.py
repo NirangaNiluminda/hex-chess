@@ -1,4 +1,5 @@
 import math
+import time
 import pygame
 from typing import Tuple
 from constants import *
@@ -157,7 +158,8 @@ class Renderer:
                selected_tile, dragging, drag_piece, legal_moves,
                reset_button_rect, undo_button_rect, flip_button_rect,
                reset_hover, undo_hover, flip_hover, history,
-               promotion_buttons=None, promotion_hover=None, flip_locked=False):
+               promotion_buttons=None, promotion_hover=None, flip_locked=False,
+               last_move=None, engine_thinking=False):
         # Clear screen
         screen.fill(BACKGROUND)
 
@@ -173,11 +175,37 @@ class Renderer:
             x, y = self.board.axial_to_pixel(display_q, display_r, center_x, center_y)
             tile.pixel_pos = (x, y)
 
+            # Check if this tile is part of the last move
+            is_last_move_start = last_move and (q, r) == (last_move[0], last_move[1])
+            is_last_move_end = last_move and (q, r) == (last_move[2], last_move[3])
+            
             # Highlight if selected or hovered
             highlight = (q, r) == selected_tile or (q, r) == hovered_coord
             is_legal_move = (q, r) in legal_moves
 
             draw_hexagon(screen, (x, y), self.board.radius, tile.color, OUTLINE, highlight)
+
+            # Draw last move highlight (orange for start, yellow for end)
+            if is_last_move_start or is_last_move_end:
+                corners = []
+                for i in range(6):
+                    angle_deg = 60 * i
+                    angle_rad = math.pi / 180 * angle_deg
+                    cx = x + self.board.radius * math.cos(angle_rad)
+                    cy = y + self.board.radius * math.sin(angle_rad)
+                    corners.append((cx, cy))
+
+                s = pygame.Surface((self.board.radius * 2, self.board.radius * 2), pygame.SRCALPHA)
+                s_corners = [(c[0] - x + self.board.radius, c[1] - y + self.board.radius) for c in corners]
+                
+                # Use constants for engine move highlighting
+                if is_last_move_start:
+                    highlight_color = ENGINE_MOVE_START
+                else:
+                    highlight_color = ENGINE_MOVE_END
+                    
+                pygame.draw.polygon(s, highlight_color, s_corners)
+                screen.blit(s, (x - self.board.radius, y - self.board.radius))
 
             # Draw legal move indicator
             if is_legal_move:
@@ -211,9 +239,20 @@ class Renderer:
                 screen.blit(piece_image, rect)
 
         # Draw current turn indicator (top center)
-        turn_text = self.turn_font.render(f"Turn: {self.board.current_turn.upper()}", True, (0, 0, 0))
-        turn_bg_rect = turn_text.get_rect(center=(self.window_w // 2, 25))
-        turn_bg_rect.inflate_ip(20, 10)
+        if engine_thinking:
+            turn_text = self.turn_font.render("ENGINE THINKING...", True, (255, 255, 255))
+            turn_bg_rect = turn_text.get_rect(center=(self.window_w // 2, 25))
+            turn_bg_rect.inflate_ip(20, 10)
+            # Pulsing effect for thinking indicator
+            pulse = int(abs(math.sin(time.time() * 3) * 30))
+            turn_color = (70 + pulse, 130 + pulse, 180 + pulse)
+            pygame.draw.rect(screen, turn_color, turn_bg_rect, border_radius=5)
+            pygame.draw.rect(screen, (255, 255, 255), turn_bg_rect, 2, border_radius=5)
+            screen.blit(turn_text, turn_text.get_rect(center=(self.window_w // 2, 25)))
+        else:
+            turn_text = self.turn_font.render(f"Turn: {self.board.current_turn.upper()}", True, (0, 0, 0))
+            turn_bg_rect = turn_text.get_rect(center=(self.window_w // 2, 25))
+            turn_bg_rect.inflate_ip(20, 10)
 
         # Draw background for turn indicator
         turn_color = (240, 240, 240) if self.board.current_turn == "white" else (80, 80, 80)
@@ -264,7 +303,7 @@ class Renderer:
         
         pygame.draw.rect(screen, flip_color, flip_button_rect, border_radius=5)
         pygame.draw.rect(screen, (40, 40, 40), flip_button_rect, 2, border_radius=5)
-        flip_text = self.small_font.render("FLIP", True, (255, 255, 255))
+        flip_text = self.small_font.render("FLIP", True, text_color)
         flip_text_rect = flip_text.get_rect(center=flip_button_rect.center)
         screen.blit(flip_text, flip_text_rect)
 
