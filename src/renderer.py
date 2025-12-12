@@ -156,8 +156,8 @@ class Renderer:
 
     def render(self, screen, center_x, center_y, mouse_pos, hovered_coord,
                selected_tile, dragging, drag_piece, legal_moves,
-               reset_button_rect, undo_button_rect, flip_button_rect,
-               reset_hover, undo_hover, flip_hover, history,
+               reset_button_rect, flip_button_rect,
+               reset_hover, flip_hover, history,
                promotion_buttons=None, promotion_hover=None, flip_locked=False,
                last_move=None, engine_thinking=False):
         # Clear screen
@@ -283,16 +283,7 @@ class Renderer:
         reset_text_rect = reset_text.get_rect(center=reset_button_rect.center)
         screen.blit(reset_text, reset_text_rect)
 
-        # Draw undo button below reset (disabled when no history)
-        undo_enabled = len(history) > 0
-        undo_color = (100, 150, 250) if (undo_hover and undo_enabled) else ((80, 130, 220) if undo_enabled else (140, 140, 140))
-        pygame.draw.rect(screen, undo_color, undo_button_rect, border_radius=5)
-        pygame.draw.rect(screen, (40, 40, 40), undo_button_rect, 2, border_radius=5)
-        undo_text = self.small_font.render("UNDO", True, (255, 255, 255) if undo_enabled else (200, 200, 200))
-        undo_text_rect = undo_text.get_rect(center=undo_button_rect.center)
-        screen.blit(undo_text, undo_text_rect)
-
-        # Draw flip button below undo
+        # Draw flip button below reset
         if flip_locked:
             # Disabled color
             flip_color = (130, 130, 130)
